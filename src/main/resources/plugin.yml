@@ -1,0 +1,5 @@
+name: Camcorder
+version: ${project.version}
+author: macguy8
+main: net.frozenorb.camcorder.Camcorder
+depend: [ ProtocolLib ]
