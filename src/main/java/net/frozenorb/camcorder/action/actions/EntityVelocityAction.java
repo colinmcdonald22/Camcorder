@@ -1,10 +1,7 @@
-package net.frozenorb.camcorder.action.type;
+package net.frozenorb.camcorder.action.actions;
 
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import net.frozenorb.camcorder.Camcorder;
 import net.frozenorb.camcorder.action.Action;
-import net.frozenorb.camcorder.playback.Playback;
 import net.frozenorb.camcorder.utils.ByteBufUtils;
 import net.minecraft.server.v1_7_R4.PacketPlayOutEntityVelocity;
 import net.minecraft.util.io.netty.buffer.ByteBuf;
@@ -12,8 +9,9 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
-@ToString
-@EqualsAndHashCode
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
 public final class EntityVelocityAction extends Action {
 
     private int entityId;
@@ -21,15 +19,16 @@ public final class EntityVelocityAction extends Action {
     private double y;
     private double z;
 
-    public EntityVelocityAction() {}
+    public EntityVelocityAction(Entity entity) {
+        Vector velocity = entity.getVelocity();
 
-    public EntityVelocityAction(Entity entity, Vector velocity) {
         this.entityId = entity.getEntityId();
         this.x = velocity.getX();
         this.y = velocity.getY();
         this.z = velocity.getZ();
     }
 
+    @Override
     public void read(ByteBuf in) {
         entityId = ByteBufUtils.readVarInt(in);
         x = in.readDouble();
@@ -37,6 +36,7 @@ public final class EntityVelocityAction extends Action {
         z = in.readDouble();
     }
 
+    @Override
     public void write(ByteBuf out) {
         ByteBufUtils.writeVarInt(entityId, out);
         out.writeDouble(x);
@@ -44,9 +44,9 @@ public final class EntityVelocityAction extends Action {
         out.writeDouble(z);
     }
 
-    public void play(Playback playback, Player viewer) {
-        PacketPlayOutEntityVelocity packet = new PacketPlayOutEntityVelocity(entityId + Camcorder.ENTITY_ID_OFFSET, x, y, z);
-        sendPacket(packet, viewer);
+    @Override
+    public void play(Player viewer) {
+        sendPacket(viewer, new PacketPlayOutEntityVelocity(entityId + Camcorder.ENTITY_ID_OFFSET, x, y, z));
     }
 
 }

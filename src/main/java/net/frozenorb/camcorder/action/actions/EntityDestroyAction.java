@@ -1,23 +1,19 @@
-package net.frozenorb.camcorder.action.type;
+package net.frozenorb.camcorder.action.actions;
 
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import net.frozenorb.camcorder.Camcorder;
 import net.frozenorb.camcorder.action.Action;
-import net.frozenorb.camcorder.playback.Playback;
 import net.frozenorb.camcorder.utils.ByteBufUtils;
 import net.minecraft.server.v1_7_R4.PacketPlayOutEntityDestroy;
 import net.minecraft.util.io.netty.buffer.ByteBuf;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
-@ToString
-@EqualsAndHashCode
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
 public final class EntityDestroyAction extends Action {
 
     private int[] entities;
-
-    public EntityDestroyAction() {}
 
     public EntityDestroyAction(Entity... destroyed) {
         entities = new int[destroyed.length];
@@ -27,10 +23,7 @@ public final class EntityDestroyAction extends Action {
         }
     }
 
-    public EntityDestroyAction(int... destroyed) {
-        entities = destroyed.clone();
-    }
-
+    @Override
     public void read(ByteBuf in) {
         entities = new int[ByteBufUtils.readVarInt(in)];
 
@@ -39,6 +32,7 @@ public final class EntityDestroyAction extends Action {
         }
     }
 
+    @Override
     public void write(ByteBuf out) {
         ByteBufUtils.writeVarInt(entities.length, out);
 
@@ -47,15 +41,15 @@ public final class EntityDestroyAction extends Action {
         }
     }
 
-    public void play(Playback playback, Player viewer) {
+    @Override
+    public void play(Player viewer) {
         int[] entitiesCopy = entities.clone();
 
         for (int i = 0; i < entitiesCopy.length; i++) {
             entitiesCopy[i] += Camcorder.ENTITY_ID_OFFSET;
         }
 
-        PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(entitiesCopy);
-        sendPacket(packet, viewer);
+        sendPacket(viewer, new PacketPlayOutEntityDestroy(entitiesCopy));
     }
 
 }

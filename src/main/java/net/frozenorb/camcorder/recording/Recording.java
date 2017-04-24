@@ -1,5 +1,7 @@
 package net.frozenorb.camcorder.recording;
 
+import com.google.common.collect.ImmutableList;
+
 import lombok.Getter;
 import net.frozenorb.camcorder.Camcorder;
 import net.frozenorb.camcorder.action.Action;
@@ -7,95 +9,115 @@ import net.frozenorb.camcorder.action.ActionRegistry;
 import net.frozenorb.camcorder.utils.ByteBufUtils;
 import net.frozenorb.qlib.qLib;
 import net.minecraft.util.io.netty.buffer.ByteBuf;
-import net.minecraft.util.io.netty.buffer.Unpooled;
+
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.World;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.util.Date;
-import java.util.LinkedList;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.zip.GZIPOutputStream;
 
 public final class Recording {
 
-    @Getter private String id = String.valueOf(qLib.RANDOM.nextInt(1000));
-    private List<Action> actions = new LinkedList<>();
-    @Getter private Date started = new Date();
-    private int tickStarted = Camcorder.getInstance().getTick();
-    private String world;
-    private int minX, minZ, maxX, maxZ;
+    @Getter private final String id;
+    @Getter private final Instant started;
+    @Getter private final String regionWorld;
+    @Getter private final int regionMinX;
+    @Getter private final int regionMaxX;
+    @Getter private final int regionMinZ;
+    @Getter private final int regionMaxZ;
+    @Getter private final List<Action> actions;
 
-    // Purposely no access level, so it becomes package-private.
-    Recording(Location a, Location b) {
-        world = a.getWorld().getName();
-        minX = Math.min(a.getBlockX(), b.getBlockX());
-        minZ = Math.min(a.getBlockZ(), b.getBlockZ());
-        maxX = Math.max(a.getBlockX(), b.getBlockX());
-        maxZ = Math.max(a.getBlockZ(), b.getBlockZ());
+    // creates a recording for playback
+    public Recording(File file) {
+        ByteBuf in = ByteBufUtils.readGzipped(file);
+        int version = ByteBufUtils.readVarInt(in);
+
+        if (version != Camcorder.RECORDING_VERSION) {
+            throw new IllegalStateException("Cannot read outdated file! File version: " + version + ", current version: " + Camcorder.RECORDING_VERSION);
+        }
+
+        id = ByteBufUtils.readString(in);
+        started = Instant.ofEpochMilli(in.readLong());
+        regionWorld = ByteBufUtils.readString(in);
+        regionMinX = ByteBufUtils.readVarInt(in);
+        regionMaxX = ByteBufUtils.readVarInt(in);
+        regionMinZ = ByteBufUtils.readVarInt(in);
+        regionMaxZ = ByteBufUtils.readVarInt(in);
+
+        int actionCount = ByteBufUtils.readVarInt(in);
+        Bukkit.broadcastMessage("preparing to read" + actionCount);
+        List<Action> loadingActions = new ArrayList<>(actionCount);
+
+        for (int i = 0; i < actionCount; i++) {
+            int type = ByteBufUtils.readVarInt(in);
+            int msOffset = ByteBufUtils.readVarInt(in);
+
+            try {
+                Action action = ActionRegistry.findAction(type).newInstance();
+                action.read(in);
+                action.setMsOffset(msOffset);
+
+                loadingActions.add(action);
+            } catch (Exception ex) {
+                throw new RuntimeException("Could not read action " + type + " (index " + i + ")", ex);
+            }
+        }
+
+        actions = ImmutableList.copyOf(loadingActions);
     }
 
-    public World getWorld() {
-        return Camcorder.getInstance().getServer().getWorld(world);
-    }
-
-    private boolean contains(String world, int x, int z) {
-        return minX <= x && maxX >= x && minZ <= z && maxZ >= z && world.equals(this.world);
-    }
-
-    public boolean contains(Location location) {
-        return contains(location.getWorld().getName(), location.getBlockX(), location.getBlockZ());
-    }
-
-    public boolean contains(Block block) {
-        return contains(block.getLocation());
+    // creates a writable recording
+    public Recording(Location a, Location b) {
+        id = String.valueOf(qLib.RANDOM.nextInt(100_000));
+        started = Instant.now();
+        regionWorld = a.getWorld().getName();
+        regionMinX = Math.min(a.getBlockX(), b.getBlockX());
+        regionMaxX = Math.max(a.getBlockX(), b.getBlockX());
+        regionMinZ = Math.min(a.getBlockZ(), b.getBlockZ());
+        regionMaxZ = Math.max(a.getBlockZ(), b.getBlockZ());
+        actions = new ArrayList<>();
     }
 
     public boolean contains(Entity entity) {
         return contains(entity.getLocation());
     }
 
-    public void recordAction(Action action) {
-        action.setTickOffset(Camcorder.getInstance().getTick() - tickStarted);
+    public boolean contains(Location location) {
+        return location.getWorld().getName().equals(regionWorld)
+            && location.getBlockX() >= regionMinX
+            && location.getBlockX() <= regionMaxX
+            && location.getBlockZ() >= regionMinZ
+            && location.getBlockZ() <= regionMaxZ;
+    }
+
+    public void record(Action action) {
+        action.setMsOffset((int) (System.currentTimeMillis() - started.toEpochMilli()));
         actions.add(action);
     }
 
-    public boolean write(File file) {
-        try {
-            OutputStream fileOutputStream = new GZIPOutputStream(new FileOutputStream(file));
-            ByteBuf buffer = Unpooled.buffer();
+    public void save(File file) {
+        ByteBufUtils.writeGzipped(file, out -> {
+            ByteBufUtils.writeVarInt(Camcorder.RECORDING_VERSION, out);
+            ByteBufUtils.writeString(id, out);
+            out.writeLong(started.toEpochMilli());
+            ByteBufUtils.writeString(regionWorld, out);
+            ByteBufUtils.writeVarInt(regionMinX, out);
+            ByteBufUtils.writeVarInt(regionMaxX, out);
+            ByteBufUtils.writeVarInt(regionMinZ, out);
+            ByteBufUtils.writeVarInt(regionMaxZ, out);
 
-            write(buffer);
+            ByteBufUtils.writeVarInt(actions.size(), out);
+            Bukkit.broadcastMessage("wrote " + actions.size() + " actions!");
 
-            byte[] bytes = new byte[buffer.readableBytes()];
-            buffer.getBytes(buffer.readerIndex(), bytes);
-
-            fileOutputStream.write(bytes);
-            fileOutputStream.close();
-
-            return true;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    public void write(ByteBuf out) {
-        ByteBufUtils.writeVarInt(Camcorder.RECORDING_VERSION, out);
-        ByteBufUtils.writeString(id, out);
-        out.writeLong(started.getTime());
-
-        ByteBufUtils.writeVarInt(actions.size(), out);
-
-        for (Action action : actions) {
-            ByteBufUtils.writeVarInt(ActionRegistry.findId(action.getClass()), out);
-            ByteBufUtils.writeVarInt(action.getTickOffset(), out);
-            action.write(out);
-        }
+            for (Action action : actions) {
+                ByteBufUtils.writeVarInt(ActionRegistry.findId(action.getClass()), out);
+                ByteBufUtils.writeVarInt(action.getMsOffset(), out);
+                action.write(out);
+            }
+        });
     }
 
 }

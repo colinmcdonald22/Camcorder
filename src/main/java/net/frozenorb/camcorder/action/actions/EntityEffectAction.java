@@ -1,10 +1,7 @@
-package net.frozenorb.camcorder.action.type;
+package net.frozenorb.camcorder.action.actions;
 
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import net.frozenorb.camcorder.Camcorder;
 import net.frozenorb.camcorder.action.Action;
-import net.frozenorb.camcorder.playback.Playback;
 import net.frozenorb.camcorder.utils.ByteBufUtils;
 import net.minecraft.server.v1_7_R4.MobEffect;
 import net.minecraft.server.v1_7_R4.PacketPlayOutEntityEffect;
@@ -13,8 +10,9 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 
-@ToString
-@EqualsAndHashCode
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
 public final class EntityEffectAction extends Action {
 
     private int entityId;
@@ -22,8 +20,6 @@ public final class EntityEffectAction extends Action {
     private byte amplifier;
     private int duration;
     private boolean hideParticles;
-
-    public EntityEffectAction() {}
 
     public EntityEffectAction(LivingEntity livingEntity, PotionEffect potionEffect) {
         this.entityId = livingEntity.getEntityId();
@@ -33,6 +29,7 @@ public final class EntityEffectAction extends Action {
         this.hideParticles = potionEffect.isAmbient();
     }
 
+    @Override
     public void read(ByteBuf in) {
         entityId = ByteBufUtils.readVarInt(in);
         effectId = in.readByte();
@@ -41,6 +38,7 @@ public final class EntityEffectAction extends Action {
         hideParticles = in.readBoolean();
     }
 
+    @Override
     public void write(ByteBuf out) {
         ByteBufUtils.writeVarInt(entityId, out);
         out.writeByte(effectId);
@@ -49,9 +47,9 @@ public final class EntityEffectAction extends Action {
         out.writeBoolean(hideParticles);
     }
 
-    public void play(Playback playback, Player viewer) {
-        PacketPlayOutEntityEffect packet = new PacketPlayOutEntityEffect(entityId + Camcorder.ENTITY_ID_OFFSET, new MobEffect(effectId, duration, amplifier, hideParticles));
-        sendPacket(packet, viewer);
+    @Override
+    public void play(Player viewer) {
+        sendPacket(viewer, new PacketPlayOutEntityEffect(entityId + Camcorder.ENTITY_ID_OFFSET, new MobEffect(effectId, duration, amplifier, hideParticles)));
     }
 
 }

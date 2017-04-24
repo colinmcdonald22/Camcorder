@@ -10,7 +10,7 @@ import org.bukkit.entity.Player;
 
 public final class RecordingStartCommand {
 
-    @Command(names={ "recording start" }, permissionNode="op")
+    @Command(names={ "recording start" }, permission="op")
     public static void recordingStart(Player sender) {
         WorldEditPlugin worldEdit = (WorldEditPlugin) Camcorder.getInstance().getServer().getPluginManager().getPlugin("WorldEdit");
 

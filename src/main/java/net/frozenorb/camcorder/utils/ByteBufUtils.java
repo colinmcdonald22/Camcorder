@@ -3,11 +3,55 @@ package net.frozenorb.camcorder.utils;
 import com.google.common.base.Charsets;
 import lombok.experimental.UtilityClass;
 import net.minecraft.util.io.netty.buffer.ByteBuf;
+import net.minecraft.util.io.netty.buffer.Unpooled;
+import net.minecraft.util.org.apache.commons.io.IOUtils;
 
+import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.ItemStack;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 @UtilityClass
 public final class ByteBufUtils {
+
+    // IO //
+
+    public void writeGzipped(File file, Consumer<ByteBuf> writer) {
+        try {
+            OutputStream fileOutputStream = new GZIPOutputStream(new FileOutputStream(file));
+            ByteBuf buffer = Unpooled.buffer();
+
+            writer.accept(buffer);
+
+            byte[] bytes = new byte[buffer.readableBytes()];
+            buffer.getBytes(buffer.readerIndex(), bytes);
+
+            fileOutputStream.write(bytes);
+            fileOutputStream.close();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    public ByteBuf readGzipped(File file) {
+        try (InputStream fileInputStream = new GZIPInputStream(new FileInputStream(file))) {
+            byte[] data = IOUtils.toByteArray(fileInputStream);
+            return Unpooled.wrappedBuffer(data);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
 
     // VarInt //
 
@@ -83,5 +127,31 @@ public final class ByteBufUtils {
         out.writeLong(value.getMostSignificantBits());
         out.writeLong(value.getLeastSignificantBits());
     }
-    
+
+    // Our weird simplistic item stack //
+    // we just store data, type, and has enchants
+
+    public static ItemStack readSimplisticItem(ByteBuf in) {
+        ItemStack result = new ItemStack(
+            Material.getMaterial(readVarInt(in)),
+            in.readByte()
+        );
+
+        if (in.readBoolean()) {
+            result.addUnsafeEnchantment(Enchantment.DURABILITY, 1);
+        }
+
+        return result;
+    }
+
+    public static void writeSimplisticItem(ItemStack value, ByteBuf out) {
+        if (value == null) {
+            value = new ItemStack(Material.AIR);
+        }
+
+        writeVarInt(value.getTypeId(), out);
+        out.writeByte(value.getData().getData());
+        out.writeBoolean(value.getEnchantments().size() != 0);
+    }
+
 }

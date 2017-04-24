@@ -2,23 +2,23 @@ package net.frozenorb.camcorder.recording;
 
 import com.google.common.collect.ImmutableSet;
 import net.frozenorb.camcorder.Camcorder;
-import net.frozenorb.camcorder.recording.components.MovementListener;
-import net.frozenorb.qlib.command.FrozenCommandHandler;
+import net.frozenorb.camcorder.recording.listeners.GeneralListener;
+
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 
 import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public final class RecordingHandler {
 
     private Set<Recording> activeRecordings = new HashSet<>();
 
     public RecordingHandler() {
-        FrozenCommandHandler.loadCommandsFromPackage(Camcorder.getInstance(), "net.frozenorb.camcorder.recording.command");
-        Camcorder.getInstance().getServer().getPluginManager().registerEvents(new MovementListener(), Camcorder.getInstance());
+        Bukkit.getPluginManager().registerEvents(new GeneralListener(this), Camcorder.getInstance());
     }
 
     public Recording startRecording(Location a, Location b) {
@@ -27,19 +27,14 @@ public final class RecordingHandler {
         return recording;
     }
 
-    public boolean stopRecording(Recording recording, File saveTo) {
+    public void stopRecording(Recording recording, File saveTo) {
         activeRecordings.remove(recording);
-
-        if (saveTo != null) {
-            return recording.write(saveTo);
-        } else {
-            return true;
-        }
+        recording.save(saveTo);
     }
 
     public Recording findRecording(String id) {
         for (Recording recording : activeRecordings) {
-            if (recording.getId().equalsIgnoreCase(id)) {
+            if (recording.getId().equals(id)) {
                 return recording;
             }
         }
@@ -47,53 +42,16 @@ public final class RecordingHandler {
         return null;
     }
 
-    // All of these findRecordings methods use lazy-initialization of the Set.
-    public Set<Recording> findRecordings(Location location) {
-        Set<Recording> recordings = null;
+    public void findRecordings(Entity entity, Consumer<Recording> recordingConsumer) {
+        findRecordings(entity.getLocation(), recordingConsumer);
+    }
 
+    public void findRecordings(Location location, Consumer<Recording> recordingConsumer) {
         for (Recording recording : activeRecordings) {
             if (recording.contains(location)) {
-                if (recordings == null) {
-                    recordings = new HashSet<>();
-                }
-
-                recordings.add(recording);
+                recordingConsumer.accept(recording);
             }
         }
-
-        return recordings == null ? ImmutableSet.of() : ImmutableSet.copyOf(recordings);
-    }
-
-    public Set<Recording> findRecordings(Entity entity) {
-        Set<Recording> recordings = null;
-
-        for (Recording recording : activeRecordings) {
-            if (recording.contains(entity)) {
-                if (recordings == null) {
-                    recordings = new HashSet<>();
-                }
-
-                recordings.add(recording);
-            }
-        }
-
-        return recordings == null ? ImmutableSet.of() : ImmutableSet.copyOf(recordings);
-    }
-
-    public Set<Recording> findRecordings(Block block) {
-        Set<Recording> recordings = null;
-
-        for (Recording recording : activeRecordings) {
-            if (recording.contains(block)) {
-                if (recordings == null) {
-                    recordings = new HashSet<>();
-                }
-
-                recordings.add(recording);
-            }
-        }
-
-        return recordings == null ? ImmutableSet.of() : ImmutableSet.copyOf(recordings);
     }
 
     public Set<Recording> getActiveRecordings() {

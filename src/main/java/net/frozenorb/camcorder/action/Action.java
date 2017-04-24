@@ -10,13 +10,13 @@ import org.bukkit.entity.Player;
 
 public abstract class Action {
 
-    @Getter @Setter private int tickOffset;
+    @Getter @Setter private int msOffset;
 
     public abstract void read(ByteBuf in);
     public abstract void write(ByteBuf out);
-    public abstract void play(Playback playback, Player viewer);
+    public abstract void play(Player viewer);
 
-    public void sendPacket(Packet packet, Player target) {
+    protected void sendPacket(Player target, Packet packet) {
         ((CraftPlayer) target).getHandle().playerConnection.sendPacket(packet);
     }
 
