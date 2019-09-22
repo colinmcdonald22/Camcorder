@@ -1,4 +1,13 @@
-// 1.7.10 Protocol Docs: http://wiki.vg/index.php?title=Protocol&oldid=6003
+# Camcorder
+
+Camcorder was developed while I was working for @FrozenOrb.
+This project was open sourced with permission from them.
+
+Camcorder existed primarily as a tech demo. As a result, some of the code is messy and there was almost no documentation.
+That being said, the core functionality (recording, saving, and playing back player movements and world interactions)
+does work perfectly fine.
+
+This project couldn't exist without the Minecraft 1.7.10 protocol docs, from the folks at wiki.vg. http://wiki.vg/index.php?title=Protocol&oldid=6003
 http://wiki.vg/index.php?title=Entities&oldid=6052
 
     // TODO: Actually record data
